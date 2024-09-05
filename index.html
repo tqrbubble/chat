@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Chat UI with Custom Markdown</title>
     <style>
         body, html {
             margin: 0;
@@ -10,7 +11,7 @@
             height: 100%;
             width: 100%;
             background-color: black;
-            font-family: Arial, sans-serif;
+            font-family: 'Courier New', monospace;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -23,8 +24,14 @@
             flex-direction: column;
             justify-content: space-between;
             background-color: black;
-            background-size: cover;
-            background-position: center;
+            background-image: radial-gradient(circle, #222 10%, transparent 11%),
+                              radial-gradient(circle at bottom left, #222 5%, transparent 6%),
+                              radial-gradient(circle at bottom right, #222 5%, transparent 6%),
+                              radial-gradient(circle at top left, #222 5%, transparent 6%),
+                              radial-gradient(circle at top right, #222 5%, transparent 6%);
+            background-size: 3em 3em;
+            background-color: black;
+            opacity: 1;
             border: 1px solid #333;
             border-radius: 10px;
             overflow: hidden;
@@ -32,35 +39,51 @@
 
         .messages {
             flex: 1;
-            padding: 10px;
+            padding: 20px;
             overflow-y: auto;
             color: white;
             font-size: 1.2em;
-            white-space: pre-wrap; /* Preserve new lines and tabs */
+            white-space: pre-wrap;
         }
 
         .message {
-            margin: 10px 0;
+            margin: 20px 0;
             clear: both;
+            position: relative;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .ai-response {
             text-align: left;
             display: flex;
-            align-items: flex-end; /* Align items to the bottom */
+            align-items: flex-start;
         }
 
-        .ai-response .spinner {
-            display: inline-block;
-            font-weight: bold;
+        .ai-response::before {
+            content: "⚛︎";
+            font-size: 1.5em;
             margin-right: 10px;
-            transition: transform 0.5s linear;
-            animation: spin 1s linear infinite;
+            opacity: 0;
+            animation: popIn 0.5s ease-out 0.2s forwards;
         }
 
-        @keyframes spin {
-            100% {
-                transform: rotate(360deg);
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
             }
         }
 
@@ -72,49 +95,100 @@
             content: "✧";
             display: block;
             font-weight: bold;
+            opacity: 0;
+            animation: popIn 0.5s ease-out forwards;
         }
 
         .input-container {
             display: flex;
             align-items: center;
-            padding: 10px;
-            background-color: black;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            transform: translateY(100%);
+            animation: slideUp 0.5s ease-out forwards;
+        }
+
+        @keyframes slideUp {
+            to {
+                transform: translateY(0);
+            }
         }
 
         .input-container input {
             flex: 1;
-            height: 20px;
+            height: 40px;
             border: none;
-            border-bottom: 1px solid white;
+            border-bottom: 2px solid white;
             background-color: transparent;
-            font-size: 1em;
+            font-size: 1.2em;
             color: white;
-            margin-right: 10px;
+            margin-right: 20px;
+            transition: border-color 0.3s ease;
         }
 
         .input-container input:focus {
             outline: none;
+            border-color: #444;
         }
 
         .input-container button {
-            background-color: black;
-            border: none;
+            background-color: transparent;
+            border: 2px solid white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             color: white;
-            font-size: 1.2em;
+            font-size: 1.5em;
+            transition: all 0.3s ease;
+        }
+
+        .input-container button:hover {
+            background-color: white;
+            color: black;
+            transform: scale(1.1);
         }
 
         .input-container button:focus {
             outline: none;
         }
+
+        .typing-indicator {
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: white;
+            margin: 0 2px;
+            opacity: 0.4;
+            animation: typingAnimation 1s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingAnimation {
+            0% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.4; transform: scale(1); }
+        }
     </style>
-    <title>Interactive Chat UI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/styles/atom-one-dark.min.css">
 </head>
 <body>
     <div class="chat-container">
@@ -122,63 +196,70 @@
             <!-- Chat messages will appear here -->
         </div>
         <div class="input-container">
-            <input type="text" id="userInput" placeholder="input">
+            <input type="text" id="userInput" placeholder="Type your message...">
             <button type="submit" onclick="sendMessage()">▶</button>
         </div>
     </div>
 
     <script>
         let chatHistory = [];
-
+        chatHistory.push({ role: 'system', content: "" });
+    
+        function parseCustomMarkdown(text) {
+            // Colored text
+            text = text.replace(/color:(\w+){([^}]+)}/g, '<span style="color:$1">$2</span>');
+    
+            // Tooltips
+            text = text.replace(/tooltip:([^]+){([^}]+)}/g, '<span class="tooltip">$2<span class="tooltiptext">$1</span></span>');
+    
+            // Collapsible sections
+            text = text.replace(/:::collapsible{([^}]+)}([\s\S]*?):::/g, '<button class="collapsible">$1</button><div class="content">$2</div>');
+    
+            // Keyboard shortcuts
+            text = text.replace(/{{([^}]+)}}/g, '<span class="keyboard">$1</span>');
+    
+            return text;
+        }
+    
         async function sendMessage() {
             const chatWindow = document.getElementById('chatWindow');
             const userInput = document.getElementById('userInput');
-            
-            // Get the user's message
+    
             const message = userInput.value.trim();
             if (message === "") return;
-
-            // Add user's message to the chat window
+    
             const userMessage = document.createElement('div');
             userMessage.classList.add('message', 'user-message');
-            userMessage.textContent = message;
+            userMessage.innerHTML = parseCustomMarkdown(message);
             chatWindow.appendChild(userMessage);
-
-            // Add user's message to chat history
+    
             chatHistory.push({ role: 'user', content: message });
-
-            // Scroll to the bottom
+    
             chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            // Clear input
+    
             userInput.value = "";
-
-            // Prepare AI response container
+    
             const aiResponse = document.createElement('div');
             aiResponse.classList.add('message', 'ai-response');
-
-            // Create spinner element
-            const spinner = document.createElement('span');
-            spinner.classList.add('spinner');
-            spinner.textContent = "✦";
-            aiResponse.appendChild(spinner);
-
-            // Create text container
+    
             const textDiv = document.createElement('div');
             aiResponse.appendChild(textDiv);
-            
+    
+            const typingIndicator = document.createElement('div');
+            typingIndicator.classList.add('typing-indicator');
+            typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+            aiResponse.appendChild(typingIndicator);
+    
             chatWindow.appendChild(aiResponse);
-
-            // Scroll to the bottom again
+    
             chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            // Send message to Groq API and stream response
-            await streamGroqAIResponse(textDiv, spinner);
+    
+            await streamGroqAIResponse(textDiv, typingIndicator);
         }
-
-        async function streamGroqAIResponse(textDiv, spinner) {
-            const GROQ_API_KEY = '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'; // Replace with your actual API key
-
+    
+        async function streamGroqAIResponse(textDiv, typingIndicator) {
+            const GROQ_API_KEY = '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';
+    
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -186,7 +267,7 @@
                     'Authorization': `Bearer ${GROQ_API_KEY}`
                 },
                 body: JSON.stringify({
-                    messages: chatHistory, // Send the entire chat history
+                    messages: chatHistory,
                     model: 'llama-3.1-70b-versatile',
                     temperature: 1,
                     max_tokens: 8000,
@@ -195,51 +276,57 @@
                     stop: null
                 })
             });
-
+    
             if (!response.ok) {
                 textDiv.textContent = 'Error: Failed to fetch response';
                 return;
             }
-
+    
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
-            let responseText = ''; // Initialize an empty string to store the entire response
-
+            let buffer = '';
+            let currentText = '';
+    
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                responseText += decoder.decode(value, { stream: true });
-
-                const chunks = responseText.split('\n').filter(chunk => chunk.startsWith('data: '));
-                let currentContent = ''; // Variable to store the latest content
-
-                chunks.forEach(chunk => {
-                    const data = chunk.replace('data: ', '');
-                    if (data === '[DONE]') {
-                        return;
-                    }
-                    try {
-                        const json = JSON.parse(data);
-                        if (json.choices && json.choices[0] && json.choices[0].delta) {
-                            const content = json.choices[0].delta.content || '';
-                            currentContent += content;
-                            textDiv.textContent = currentContent.replace(/\n/g, '\n').replace(/\t/g, '    '); // Support new lines and tabs
-                            chatWindow.scrollTop = chatWindow.scrollHeight;
+                buffer += decoder.decode(value, { stream: true });
+    
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+    
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+                        try {
+                            const json = JSON.parse(data);
+                            if (json.choices && json.choices[0] && json.choices[0].delta) {
+                                const content = json.choices[0].delta.content || '';
+                                await displayTextWordByWord(textDiv, content, currentText);
+                                currentText += content;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse JSON:', e);
                         }
-                    } catch (e) {
-                        console.error('Failed to parse JSON:', e);
                     }
-                });
+                }
             }
-
-            // Remove spinning effect after receiving the full response
-            spinner.classList.remove('spinner');
-
-            // Add assistant's response to chat history
-            chatHistory.push({ role: 'assistant', content: textDiv.textContent });
+    
+            typingIndicator.remove();
+            chatHistory.push({ role: 'assistant', content: currentText });
         }
-
-        // Allow pressing Enter to send a message
+    
+        async function displayTextWordByWord(textDiv, newContent, currentText) {
+            const words = newContent.split(/(\s+)/);
+            for (const word of words) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                currentText += word;
+                textDiv.innerHTML = parseCustomMarkdown(currentText);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+    
         document.getElementById('userInput').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
                 sendMessage();
