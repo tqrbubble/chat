@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Chat UI with Custom Markdown</title>
+    <title>FasterAI</title>
     <style>
         body, html {
             margin: 0;
@@ -197,69 +197,60 @@
         </div>
         <div class="input-container">
             <input type="text" id="userInput" placeholder="Type your message...">
-            <button type="submit" onclick="sendMessage()">▶</button>
+            <button type="submit" id="sendButton">▶</button>
         </div>
     </div>
 
     <script>
         let chatHistory = [];
-        chatHistory.push({ role: 'system', content: "" });
-    
-        function parseCustomMarkdown(text) {
-            // Colored text
-            text = text.replace(/color:(\w+){([^}]+)}/g, '<span style="color:$1">$2</span>');
-    
-            // Tooltips
-            text = text.replace(/tooltip:([^]+){([^}]+)}/g, '<span class="tooltip">$2<span class="tooltiptext">$1</span></span>');
-    
-            // Collapsible sections
-            text = text.replace(/:::collapsible{([^}]+)}([\s\S]*?):::/g, '<button class="collapsible">$1</button><div class="content">$2</div>');
-    
-            // Keyboard shortcuts
-            text = text.replace(/{{([^}]+)}}/g, '<span class="keyboard">$1</span>');
-    
+
+        function parseMarkdown(text) {
             return text;
         }
-    
-        async function sendMessage() {
+
+        async function sendMessage(prompt) {
             const chatWindow = document.getElementById('chatWindow');
             const userInput = document.getElementById('userInput');
-    
-            const message = userInput.value.trim();
+
+            // Use provided prompt or fallback to input field value
+            const message = prompt || userInput.value.trim();
             if (message === "") return;
-    
-            const userMessage = document.createElement('div');
-            userMessage.classList.add('message', 'user-message');
-            userMessage.innerHTML = parseCustomMarkdown(message);
-            chatWindow.appendChild(userMessage);
-    
+
+            if (userInput.value) {
+                const userMessage = document.createElement('div');
+                userMessage.classList.add('message', 'user-message');
+                userMessage.innerHTML = parseMarkdown(message);
+                chatWindow.appendChild(userMessage);
+            }
+            
             chatHistory.push({ role: 'user', content: message });
-    
             chatWindow.scrollTop = chatWindow.scrollHeight;
-    
-            userInput.value = "";
-    
+
+            if (!prompt) {
+                userInput.value = "";
+            }
+
             const aiResponse = document.createElement('div');
             aiResponse.classList.add('message', 'ai-response');
-    
+
             const textDiv = document.createElement('div');
             aiResponse.appendChild(textDiv);
-    
+            
             const typingIndicator = document.createElement('div');
             typingIndicator.classList.add('typing-indicator');
             typingIndicator.innerHTML = '<span></span><span></span><span></span>';
             aiResponse.appendChild(typingIndicator);
-    
+
             chatWindow.appendChild(aiResponse);
-    
+
             chatWindow.scrollTop = chatWindow.scrollHeight;
-    
+
             await streamGroqAIResponse(textDiv, typingIndicator);
         }
-    
+
         async function streamGroqAIResponse(textDiv, typingIndicator) {
             const GROQ_API_KEY = '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';
-    
+
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -276,25 +267,25 @@
                     stop: null
                 })
             });
-    
+
             if (!response.ok) {
                 textDiv.textContent = 'Error: Failed to fetch response';
                 return;
             }
-    
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
             let buffer = '';
             let currentText = '';
-    
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
-    
+
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
-    
+
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6);
@@ -312,25 +303,34 @@
                     }
                 }
             }
-    
+
             typingIndicator.remove();
             chatHistory.push({ role: 'assistant', content: currentText });
         }
-    
+
         async function displayTextWordByWord(textDiv, newContent, currentText) {
             const words = newContent.split(/(\s+)/);
             for (const word of words) {
                 await new Promise(resolve => setTimeout(resolve, 0));
                 currentText += word;
-                textDiv.innerHTML = parseCustomMarkdown(currentText);
+                textDiv.innerHTML = parseMarkdown(currentText);
                 chatWindow.scrollTop = chatWindow.scrollHeight;
             }
         }
-    
-        document.getElementById('userInput').addEventListener('keypress', function(event) {
+
+        document.getElementById('sendButton').addEventListener('click', () => {
+            sendMessage();
+        });
+
+        document.getElementById('userInput').addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 sendMessage();
+                event.preventDefault();
             }
+        });
+
+        window.addEventListener('load', () => {
+            sendMessage("Introduce yourself, its the users first time Here. Start with 'Hello and Welcome to FasterAI'");
         });
     </script>
 </body>
